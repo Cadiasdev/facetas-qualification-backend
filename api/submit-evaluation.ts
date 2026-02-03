@@ -11,12 +11,10 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-  // Responde o preflight
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
 
-  // Bloqueia métodos diferentes de POST
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -24,6 +22,11 @@ export default async function handler(req, res) {
   try {
     const { clinic_slug, answers, uploaded_photo } = req.body;
 
+    if (!clinic_slug || !answers) {
+      return res.status(400).json({ error: 'Invalid payload' });
+    }
+
+    // 1️⃣ Buscar clínica
     const { data: clinic, error: clinicError } = await supabase
       .from('clinics')
       .select('id')
@@ -34,6 +37,7 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Clinic not found' });
     }
 
+    // 2️⃣ Calcular score
     let score = 0;
     if (answers.urgency === 'immediate') score += 20;
     if (answers.budget >= 4000) score += 25;
@@ -45,30 +49,34 @@ export default async function handler(req, res) {
     if (score >= 70) profile_type = 'premium';
     else if (score >= 40) profile_type = 'potential';
 
+    // 3️⃣ Inserir lead COMPLETO
     const { data: lead, error: leadError } = await supabase
       .from('leads')
       .insert({
         clinic_id: clinic.id,
+        urgency: answers.urgency,
+        budget: answers.budget,
+        motivation: answers.motivation || null,
+        researched_before: answers.researched_before,
+        uploaded_photo: uploaded_photo || false,
         score,
-        profile_type
+        profile_type,
+        status: 'new'
       })
       .select()
       .single();
 
-    if (leadError) throw leadError;
+    if (leadError) {
+      console.error(leadError);
+      return res.status(500).json({ error: 'Failed to save lead' });
+    }
 
-    const responses = Object.entries(answers).map(([key, value]) => ({
-      lead_id: lead.id,
-      question_key: key,
-      answer_value: String(value)
-    }));
-
-    await supabase.from('lead_responses').insert(responses);
-
+    // 4️⃣ Resposta limpa para o frontend
     return res.status(200).json({
       success: true,
-      profile_type,
-      score
+      lead_id: lead.id,
+      score,
+      profile_type
     });
 
   } catch (err) {
