@@ -12,9 +12,10 @@ export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
-  if (req.method === "OPTIONS") {
-    return res.status(200).end();
-  }
+if (req.method === "OPTIONS") {
+  return res.status(200).end();
+}
+
 
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
@@ -74,28 +75,29 @@ export default async function handler(req, res) {
     }
 
     // Enviar email (NÃO pode quebrar o fluxo)
+    // ⚠️ Envio de email NÃO pode quebrar o fluxo
     try {
       await sendClinicReport({
         clinicEmail: process.env.CLINIC_NOTIFICATION_EMAIL!,
-        clinicName: "Clínica Dentária", // depois vem do banco
-        lead: {
-          name: lead.name,
-          phone: lead.phone,
-          email: lead.email,
-          urgency: lead.urgency,
-          budget: lead.budget,
-          motivation: lead.motivation,
-          researched_before: lead.researched_before,
-          score: lead.score,
-          profile_type: lead.profile_type,
-          photo_url: lead.photo_url,
-          created_at: lead.created_at,
-        },
-      });
-    } catch (emailError) {
-      console.error("Email failed:", emailError);
-      // ⚠️ não retorna erro para o cliente
-    }
+        clinicName: "Clínica Dentária",
+          lead: {
+            name: lead.name,
+            phone: lead.phone,
+            email: lead.email,
+            urgency: lead.urgency,
+            budget: lead.budget,
+            motivation: lead.motivation,
+            researched_before: lead.researched_before,
+            score: lead.score,
+            profile_type: lead.profile_type,
+            photo_url: lead.photo_url,
+            created_at: lead.created_at,
+      },
+    });
+}     catch (emailError) {
+      console.error("⚠️ Email failed, but lead saved:", emailError);
+  }
+
 
     // Resposta limpa para o frontend
     return res.status(200).json({
